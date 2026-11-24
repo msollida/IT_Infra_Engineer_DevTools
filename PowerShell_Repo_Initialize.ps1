@@ -1,4 +1,4 @@
-$repoUrl = "https://github.com/CHS-PROD-ORG/IT_Infra_Engineer_DevTools.git"
+$repoUrl = "https://github.com/msollida/IT_Infra_Engineer_DevTools.git"
 $repoName = (($repoUrl.TrimEnd('/') -split '/')[-1] -replace '\.git$', '')
 $gitUserName = Read-Host "What name should Git use globally?"
 $gitUserEmail = Read-Host "What email should Git use globally?"
