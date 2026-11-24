@@ -1,0 +1,48 @@
+{
+    "git.enableSmartCommit": true,
+    "remote.SSH.remotePlatform": {
+        "Calm-DSL": "linux"
+    },
+    "git.confirmSync": false,
+    "git.openRepositoryInParentFolders": "never",
+    "explorer.confirmDragAndDrop": false,
+    "yaml.disableSchemaDetection": [
+        "**/.github/workflows/*.yml",
+        "**/.github/workflows/*.yaml",
+        "**/.gitea/workflows/*.yml",
+        "**/.gitea/workflows/*.yaml",
+        "**/.forgejo/workflows/*.yml",
+        "**/.forgejo/workflows/*.yaml"
+    ],
+  // Stop file watcher from consuming CPU on build/dependency folders
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/target/**": true
+  },
+
+  // Prevent search indexing from crawling generated artifacts
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/.venv": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/*.code-search": true
+  },
+
+  // Skip indexing hidden files that don't need instant lookup
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  },
+  "gitlens.graph.details.location": "auto"
+}

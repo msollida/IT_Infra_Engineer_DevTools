@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "ms-vsliveshare.vsliveshare",
+    "ole-jh.tflint-linter",
+    "redhat.ansible",
+    "redhat.vscode-yaml",
+    "usernamehw.errorlens",
+    "vivaxy.vscode-conventional-commits"]
+  }
