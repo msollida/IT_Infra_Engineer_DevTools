@@ -2,6 +2,23 @@ $repoUrl = "https://github.com/msollida/IT_Infra_Engineer_DevTools.git"
 $repoName = (($repoUrl.TrimEnd('/') -split '/')[-1] -replace '\.git$', '')
 $gitUserName = Read-Host "What name should Git use globally?"
 $gitUserEmail = Read-Host "What email should Git use globally?"
+$repoPath = Read-Host "Where should the first repository folder be created? (parent directory)"
+
+$defaultNewRepoName = "$($env:USERNAME)_firstrepo"
+$newRepoName = Read-Host "Name for the new repository [$defaultNewRepoName]"
+if ([string]::IsNullOrWhiteSpace($newRepoName)) {
+    $newRepoName = $defaultNewRepoName
+}
+if ($newRepoName -in @(".", "..") -or $newRepoName.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0) {
+    throw "The repository name is not a valid folder name."
+}
+
+$repoPath = [System.IO.Path]::GetFullPath($repoPath)
+$repoCheckPath = [System.IO.Path]::GetFullPath($repoCheckPath)
+$newRepoPath = Join-Path $repoPath $newRepoName
+if (Test-Path -LiteralPath $newRepoPath) {
+    throw "The new repository folder already exists: $newRepoPath"
+}
 
 if ($env:GIT_CONFIG_GLOBAL) {
     $gitConfigPath = [System.IO.Path]::GetFullPath($env:GIT_CONFIG_GLOBAL)
@@ -39,7 +56,6 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to set the global Git user name." }
 git config --global user.email $gitUserEmail
 if ($LASTEXITCODE -ne 0) { throw "Failed to set the global Git user email." }
 
-$repoPath = Read-Host "Where should the repository folder be created? (parent directory)"
 $repoCheckPath = Join-Path $repoPath $repoName
 
 if (Test-Path -LiteralPath $repoCheckPath) {
@@ -53,4 +69,80 @@ else {
     if ($LASTEXITCODE -ne 0) { throw "Git clone failed." }
 }
 
-code $repoCheckPath
+
+
+
+
+$exactWorkspaceMatches = @()
+$containingWorkspaceMatches = @()
+foreach ($workspaceFile in Get-ChildItem -LiteralPath $repoPath -Filter "*.code-workspace" -File) {
+    $candidateWorkspace = Get-Content -LiteralPath $workspaceFile.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
+    foreach ($workspaceFolder in @($candidateWorkspace.folders)) {
+        if (-not $workspaceFolder.path) { continue }
+        if ([System.IO.Path]::IsPathRooted($workspaceFolder.path)) {
+            $resolvedWorkspaceFolder = [System.IO.Path]::GetFullPath($workspaceFolder.path)
+        }
+        else {
+            $resolvedWorkspaceFolder = [System.IO.Path]::GetFullPath((Join-Path $workspaceFile.DirectoryName $workspaceFolder.path))
+        }
+
+        if ($resolvedWorkspaceFolder -ieq $repoCheckPath) {
+            if ($workspaceFile.FullName -notin $exactWorkspaceMatches) {
+                $exactWorkspaceMatches += $workspaceFile.FullName
+            }
+        }
+        elseif ($repoCheckPath.StartsWith($resolvedWorkspaceFolder.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            if ($workspaceFile.FullName -notin $containingWorkspaceMatches) {
+                $containingWorkspaceMatches += $workspaceFile.FullName
+            }
+        }
+    }
+}
+
+if ($exactWorkspaceMatches.Count -eq 1) {
+    $workspaceFilePath = $exactWorkspaceMatches[0]
+}
+elseif ($exactWorkspaceMatches.Count -gt 1) {
+    throw "More than one VS Code workspace includes the cloned repository. Keep only one matching workspace in $repoPath."
+}
+elseif ($containingWorkspaceMatches.Count -eq 1) {
+    $workspaceFilePath = $containingWorkspaceMatches[0]
+}
+else {
+    throw "Could not identify one existing VS Code workspace for $repoCheckPath in $repoPath."
+}
+
+$desktopPath = [System.Environment]::GetFolderPath("Desktop")
+if (-not $desktopPath -or -not (Test-Path -LiteralPath $desktopPath)) {
+    throw "Could not locate the current user's Desktop folder."
+}
+$workspaceOutputPath = Join-Path $desktopPath "$newRepoName.code-workspace"
+if (Test-Path -LiteralPath $workspaceOutputPath) {
+    throw "A workspace file already exists at $workspaceOutputPath"
+}
+
+git init $newRepoPath
+if ($LASTEXITCODE -ne 0) { throw "Failed to initialize the new repository." }
+
+$workspace = Get-Content -LiteralPath $workspaceFilePath -Raw | ConvertFrom-Json -ErrorAction Stop
+$workspaceFolders = @()
+foreach ($workspaceFolder in @($workspace.folders)) {
+    $folderCopy = [ordered]@{}
+    foreach ($property in $workspaceFolder.PSObject.Properties) {
+        $folderCopy[$property.Name] = $property.Value
+    }
+    if ([System.IO.Path]::IsPathRooted($workspaceFolder.path)) {
+        $folderCopy["path"] = [System.IO.Path]::GetFullPath($workspaceFolder.path)
+    }
+    else {
+        $folderCopy["path"] = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $workspaceFilePath) $workspaceFolder.path))
+    }
+    $workspaceFolders += [PSCustomObject]$folderCopy
+}
+
+$workspaceFolders += [PSCustomObject]@{ path = $newRepoPath }
+$workspace.folders = $workspaceFolders
+$workspace | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $workspaceOutputPath -Encoding UTF8 -ErrorAction Stop
+
+code $workspaceOutputPath
+if ($LASTEXITCODE -ne 0) { throw "Failed to open the saved VS Code workspace." }
